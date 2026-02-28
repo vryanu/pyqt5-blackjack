@@ -1,16 +1,14 @@
 # blackjack made with PyQt5
 
-- start with $1000
-- hit enter to start round
+# controls
+- 'enter' = start round
 - '1' = hit
 - '2' = stand
 - '3' = fold
 
 # features
-
-- dealer logic
-- ace logic
-- custom message ui
-- window auto resize
+- dealer stands at 17
+- start with $1000
 - 52 card deck
+- score tracker
 - blackjack = 1.5x
