@@ -13,9 +13,13 @@ class Blackjack(QWidget):
         self.balance = 1000
         self.bet = 0
         self.player_hand = []
+        self.bot_balance = 1000
+        self.bot_bet = 0
+        self.bot_hand = []
         self.dealer_hand = []
         self.dealer_score = 0
         self.user_score = 0
+        self.bot_score = 0
         self.cards = [
             ("cards/2_of_spades.png",2), ("cards/3_of_spades.png",3), ("cards/4_of_spades.png",4),
             ("cards/5_of_spades.png",5), ("cards/6_of_spades.png",6), ("cards/7_of_spades.png",7),
@@ -42,12 +46,12 @@ class Blackjack(QWidget):
 
     def init_ui(self):
         self.setWindowTitle("Blackjack")
-        self.adjustSize()
-        self.move(0, 0)
+        self.setGeometry(0, 0, 1000, 500)
         self.setStyleSheet("QWidget { background-color: #732532; }")
 
         main_layout = QVBoxLayout()
         main_layout.setAlignment(Qt.AlignTop)
+
 
         #  Bet Widget 
         bet_widget = QWidget()
@@ -85,21 +89,36 @@ class Blackjack(QWidget):
         bet_layout.addWidget(self.start_button, 0, 2, alignment=Qt.AlignLeft)
         main_layout.addWidget(bet_widget, alignment=Qt.AlignHCenter)
 
-        #  Dealer Label & Cards 
+        labels_layout = QHBoxLayout()
+
         self.dealer_label = QLabel("Dealer: 0")
         self.dealer_label.setStyleSheet("color: #d1a23d; font-size: 18px; font-weight: bold; padding: 10px;")
-        main_layout.addWidget(self.dealer_label)
+        labels_layout.addWidget(self.dealer_label, alignment=Qt.AlignLeft)
+
+        self.bot_label = QLabel(f"Bot: 0")
+        self.bot_label.setStyleSheet("color: #d1a23d; font-size: 18px; font-weight: bold; padding: 2px;")
+        labels_layout.addWidget(self.bot_label, alignment=Qt.AlignRight)
+
+        main_layout.addLayout(labels_layout)
+
+        cards_row_layout = QHBoxLayout()
 
         self.dealer_card_layout = QHBoxLayout()
-        main_layout.addLayout(self.dealer_card_layout)
+        self.bot_card_layout = QHBoxLayout()
+
+        cards_row_layout.addLayout(self.dealer_card_layout)
+        cards_row_layout.addStretch()
+        cards_row_layout.addLayout(self.bot_card_layout)
+
+        main_layout.addLayout(cards_row_layout)
 
         #  Balance & Score 
-        self.balance_label = QLabel(f"Balance: ${self.balance}")
+        self.balance_label = QLabel(f"Balance: ${self.balance}\n Bot Balance: ${self.bot_balance}")
         self.balance_label.setAlignment(Qt.AlignCenter)
         self.balance_label.setStyleSheet("color: #d1a23d; font-size: 18px; font-weight: bold; padding: 2px;")
         main_layout.addWidget(self.balance_label)
 
-        self.score_label = QLabel(f"Score: {self.user_score} - {self.dealer_score}")
+        self.score_label = QLabel(f"Score: Y,{self.user_score} - D,{self.dealer_score} - B,{self.bot_score}")
         self.score_label.setAlignment(Qt.AlignCenter)
         self.score_label.setStyleSheet("color: #d1a23d; font-size: 18px; font-weight: bold; padding: 2px;")
         main_layout.addWidget(self.score_label)
@@ -110,6 +129,7 @@ class Blackjack(QWidget):
         main_layout.addWidget(self.user_label)
 
         self.player_card_layout = QHBoxLayout()
+        self.player_card_layout.setAlignment(Qt.AlignCenter)
         main_layout.addLayout(self.player_card_layout)
 
         #  Buttons 
@@ -212,32 +232,39 @@ class Blackjack(QWidget):
         except ValueError:
             self.show_message("Invalid Bet", "Enter a valid number")
             return
-
+        self.bot_bet = self.bet
         self.hit_button.setHidden(False)
         self.stand_button.setHidden(False)
         self.fold_button.setHidden(False)
 
         self.player_hand = []
         self.dealer_hand = []
+        self.bot_hand = []
         self.clear_layout(self.player_card_layout)
         self.clear_layout(self.dealer_card_layout)
+        self.clear_layout(self.bot_card_layout)
 
         for _ in range(2):
             self.player_hand.append(random.choice(self.cards))
             self.dealer_hand.append(random.choice(self.cards))
+            self.bot_hand.append(random.choice(self.cards))
 
         for card in self.player_hand:
             self.add_card_gui(card, self.player_card_layout)
         for card in self.dealer_hand:
             self.add_card_gui(card, self.dealer_card_layout)
+        for card in self.bot_hand:
+            self.add_card_gui(card, self.bot_card_layout)
 
         self.update_totals()
 
     def update_totals(self, hide_dealer_second=False):
         player_total = self.calculate_total(self.player_hand)
         dealer_total = self.calculate_total(self.dealer_hand) if not hide_dealer_second else self.dealer_hand[0][1]
+        bot_total = self.calculate_total(self.bot_hand)
         self.user_label.setText(f"You: {player_total}")
         self.dealer_label.setText(f"Dealer: {dealer_total}")
+        self.bot_label.setText(f"Bot: {bot_total}")
 
     def calculate_total(self, hand):
         total = sum(card[1] for card in hand)
@@ -248,15 +275,23 @@ class Blackjack(QWidget):
         return total
 
     def hit(self):
+        player_total = self.calculate_total(self.player_hand)
+        dealer_total = self.calculate_total(self.dealer_hand)
+        bot_total = self.calculate_total(self.bot_hand)
         new_card = random.choice(self.cards)
         self.player_hand.append(new_card)
         self.add_card_gui(new_card, self.player_card_layout)
         total = self.calculate_total(self.player_hand)
         self.user_label.setText(f"You: {total}")
         if total > 21:
-            self.show_message("Bust", f"House Wins, You Lose ${self.bet}")
+            if dealer_total > bot_total:
+                self.show_message("Bust", f"House Wins, You Lose ${self.bet}")
+            elif dealer_total < bot_total:
+                self.show_message("Bust", f"Bot Wins, You Lose ${self.bet}")
+            else:
+                self.show_message("Bust", f"Bot and House Tie ${self.bet}")
             self.balance -= self.bet
-            self.balance_label.setText(f"Balance: {self.balance}")
+            self.balance_label.setText(f"Balance: {self.balance}\n Bot Balance: ${self.bot_balance}")
             self.reset_round()
 
     def stand(self):
@@ -266,40 +301,70 @@ class Blackjack(QWidget):
             self.add_card_gui(card, self.dealer_card_layout)
         self.update_totals()
 
+        while self.calculate_total(self.bot_hand) < 17:
+            card = random.choice(self.cards)
+            self.bot_hand.append(card)
+            self.add_card_gui(card, self.bot_card_layout)
+        self.update_totals()
+
         player_total = self.calculate_total(self.player_hand)
         dealer_total = self.calculate_total(self.dealer_hand)
+        bot_total = self.calculate_total(self.bot_hand)
 
-        if player_total == 21 and dealer_total != 21:
-            self.show_message("Blackjack!", f"Blackjack, You Win ${int(self.bet*1.5)}!")
-            self.balance += int(self.bet*1.5)
-        elif dealer_total > 21:
-            self.show_message("Result", f"Dealer Busts, You Win ${self.bet}!")
-            self.balance += self.bet
-        elif player_total > dealer_total:
+        if player_total == 21 and dealer_total != 21 and bot_total != 21:
+            self.show_message("Blackjack!", f"Blackjack, You Win ${int(self.bet * 1.5)}!")
+            self.balance += int(self.bet * 1.5)
+            self.bot_balance -= self.bot_bet
+        elif player_total <= 21 and (player_total > dealer_total or dealer_total > 21) and (
+                player_total > bot_total or bot_total > 21):
             self.show_message("Result", f"You Win ${self.bet}!")
             self.balance += self.bet
-        elif dealer_total == player_total:
-            self.show_message("Result", "Tie!")
+            self.bot_balance -= self.bot_bet
+        elif dealer_total <= 21 and (dealer_total > player_total or player_total > 21) and (
+                dealer_total > bot_total or bot_total > 21):
+            if dealer_total > 21:
+                self.show_message("Result", f"Dealer Busts, You Win ${self.bet}!")
+                self.balance += self.bet
+                self.bot_balance -= self.bot_bet
+            else:
+                self.show_message("Result", f"House Wins, You Lose ${self.bet}")
+                self.balance -= self.bet
+                self.bot_balance -= self.bot_bet
+        elif bot_total <= 21 and (bot_total > player_total or player_total > 21) and (
+                bot_total > dealer_total or dealer_total > 21):
+            if bot_total > 21:
+                self.show_message("Result", f"Bot Busts, You Win ${self.bet}!")
+                self.balance += self.bet
+                self.bot_balance -= self.bot_bet
+            else:
+                self.show_message("Result", f"Bot Wins, You Lose ${self.bet}")
+                self.balance -= self.bet
+                self.bot_balance += self.bot_bet
         else:
-            self.show_message("Result", f"House Wins, You Lose ${self.bet}")
-            self.balance -= self.bet
+            self.show_message("Result", "Tie!")
 
-        self.balance_label.setText(f"Balance: {self.balance}")
+        self.balance_label.setText(f"Balance: {self.balance}\n Bot Balance: ${self.bot_balance}")
         self.reset_round()
 
     def fold(self):
         self.balance -= self.bet
-        self.balance_label.setText(f"Balance: {self.balance}")
+        self.balance_label.setText(f"Balance: {self.balance}\n Bot Balance: ${self.bot_balance}")
         self.reset_round()
 
     def add_score(self):
         player_total = self.calculate_total(self.player_hand)
         dealer_total = self.calculate_total(self.dealer_hand)
-        if player_total <= 21 and (player_total > dealer_total or dealer_total > 21):
+        bot_total = self.calculate_total(self.bot_hand)
+        if player_total <= 21 and (player_total > dealer_total or dealer_total > 21) and (
+                player_total > bot_total or bot_total > 21):
             self.user_score += 1
-        if dealer_total <= 21 and (dealer_total > player_total or player_total > 21):
+        if dealer_total <= 21 and (dealer_total > player_total or player_total > 21) and (
+                dealer_total > bot_total or bot_total > 21):
             self.dealer_score += 1
-        self.score_label.setText(f"Score: {self.user_score} - {self.dealer_score}")
+        if bot_total <= 21 and (bot_total > player_total or player_total > 21) and (
+                bot_total > dealer_total or dealer_total > 21):
+            self.bot_score += 1
+        self.score_label.setText(f"Score: Y,{self.user_score} - D,{self.dealer_score} - B,{self.bot_score}")
 
     def reset_round(self):
         if self.balance == 0:
@@ -310,11 +375,14 @@ class Blackjack(QWidget):
         self.add_score()
         self.player_hand = []
         self.dealer_hand = []
+        self.bot_hand = []
         self.clear_layout(self.player_card_layout)
         self.clear_layout(self.dealer_card_layout)
+        self.clear_layout(self.bot_card_layout)
         self.user_label.setText("You: 0")
         self.dealer_label.setText("Dealer: 0")
-        self.score_label.setText(f"Score: {self.user_score} - {self.dealer_score}")
+        self.bot_label.setText("Bot: 0")
+        self.score_label.setText(f"Score: Y,{self.user_score} - D,{self.dealer_score} - B,{self.bot_score}")
         self.adjustSize()
 
     def add_card_gui(self, card, layout):
